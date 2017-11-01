@@ -10,15 +10,21 @@ namespace MailAusDatei
     class Program
     {
         static NameValueCollection Get = System.Configuration.ConfigurationManager.AppSettings;
-        // Prüft ob wat da iss
+
         static void Main(string[] args)
         {
-            string path = "Kunden";
+            EasyTimer.SetInterval(
+                ProcessIfDict
+                , Convert.ToInt32(Get["sendeIntervalStunden"]) * 60 * 60 * 1000);
+        }
+
+        // Prüft ob wat da iss und macht dann.
+        public static void ProcessIfDict()
+        {
+            string path = Get["Kunden"];
             if (Directory.Exists(path))
-            {
-                // This path is a directory
-                ProcessDirectory(path);
-            }
+                ProcessDirectory(path);    // This path is a directory
+            
         }
 
         // knöpft sich jede File einzeln vor zum verschicken
@@ -44,13 +50,14 @@ namespace MailAusDatei
                     Get["smptPasswort"]);
 
                 foreach (string fileName in fileEntries)
-                    ProcessFile(fileName, client);
-
+                    if(!fileName.EndsWith("Beispiel.json"))
+                        ProcessFile(fileName, client);
+                
                 client.Disconnect(true);
             }
        }
 
-        // 
+        // macht aus dem json eine email
         public static void ProcessFile(string path, SmtpClient client)
         {
         JObject ConfigFile = JObject.Parse(File.ReadAllText(path));
@@ -70,5 +77,28 @@ namespace MailAusDatei
 
             client.Send(message);
         }
+    }
+
+    /// <summary>
+    ///  iss halt notwendig als interval helper
+    /// </summary>
+    public static class EasyTimer
+    {
+        public static IDisposable SetInterval(Action method, int delayInMilliseconds)
+        {
+            System.Timers.Timer timer = new System.Timers.Timer(delayInMilliseconds);
+            timer.Elapsed += (source, e) =>
+            {
+                method();
+            };
+
+            timer.Enabled = true;
+            timer.Start();
+
+            // Returns a stop handle which can be used for stopping
+            // the timer, if required
+            return timer as IDisposable;
+        }
+
     }
 }
